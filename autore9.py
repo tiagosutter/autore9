@@ -1,5 +1,6 @@
 import urllib.request
 import urllib.parse
+from getpass import getpass
 
 
 def consulta(rgu, senha, url):
@@ -24,3 +25,6 @@ query = {'bdbanco': 'InformaUCP',
 
 query_string = urllib.parse.urlencode(query)
 url_consulta = url_base + query_string
+
+rgu = int(input("Digite seu RGU: "))
+senha = getpass("Digite sua senha: ")
