@@ -28,3 +28,10 @@ url_consulta = url_base + query_string
 
 rgu = int(input("Digite seu RGU: "))
 senha = getpass("Digite sua senha: ")
+
+resultado_consulta = consulta(rgu, senha, url_consulta)
+
+if "Senha Inválida" in resultado_consulta:
+    print("Senha Inválida.")
+elif  "Usuário não cadastrado" in resultado_consulta:
+    print("Usuário não cadastrado.")
