@@ -1,6 +1,7 @@
 import urllib.request
 import urllib.parse
 from getpass import getpass
+import re
 
 
 def consulta(rgu, senha, url):
@@ -10,6 +11,12 @@ def consulta(rgu, senha, url):
     with urllib.request.urlopen(url, data=encoded_login_payload) as resposta:
         html = resposta.read().decode("iso-8859-1")
     return html
+
+
+def get_datas_devolucao(html_consulta):
+    """Retorna uma lista com as datas de devolução previstas"""
+    datas = re.findall(r"\d{2}/\d{2}/\d{2}", html_consulta)
+    return datas
 
 url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/empcons?'
 
