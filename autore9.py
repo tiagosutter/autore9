@@ -18,6 +18,12 @@ def get_datas_devolucao(html_consulta):
     datas = re.findall(r"\d{2}/\d{2}/\d{2}", html_consulta)
     return datas
 
+
+def get_urls_renovacao(html_consulta):
+    """Retorna uma lista com URLs relativos de renovação"""
+    urls = re.findall(r"(emprenova\?.*?)'", html_consulta)
+    return urls
+
 url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/empcons?'
 
 # dados necessários para fazer consulta de emprestimos
