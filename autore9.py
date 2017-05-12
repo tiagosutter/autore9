@@ -24,7 +24,8 @@ def get_urls_renovacao(html_consulta):
     urls = re.findall(r"(emprenova\?.*?)'", html_consulta)
     return urls
 
-url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/empcons?'
+url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
+pagina_consulta = '/empcons?'
 
 # dados necessários para fazer consulta de emprestimos
 query = {'bdbanco': 'InformaUCP',
@@ -37,7 +38,7 @@ query = {'bdbanco': 'InformaUCP',
          'unidade': ''}
 
 query_string = urllib.parse.urlencode(query)
-url_consulta = url_base + query_string
+url_consulta = url_base + pagina_consulta + query_string
 
 rgu = int(input("Digite seu RGU: "))
 senha = getpass("Digite sua senha: ")
@@ -46,5 +47,5 @@ resultado_consulta = consulta(rgu, senha, url_consulta)
 
 if "Senha Inválida" in resultado_consulta:
     print("Senha Inválida.")
-elif  "Usuário não cadastrado" in resultado_consulta:
+elif "Usuário não cadastrado" in resultado_consulta:
     print("Usuário não cadastrado.")
