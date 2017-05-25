@@ -1,7 +1,7 @@
 import urllib.request
 import urllib.parse
 from getpass import getpass
-from datetime import date
+from datetime import date, timedelta
 import re
 
 
@@ -29,6 +29,15 @@ def get_urls_renovacao(html_consulta):
     """Retorna uma lista com URLs relativos de renovação"""
     urls = re.findall(r"(emprenova\?.*?)'", html_consulta)
     return urls
+
+
+def necessita_renovar(data_devolucao):
+    """
+    Retorna True caso falte 1 dia ou menos para a data de devolução prevista.
+    """
+    hoje = date.today()
+    amanha = hoje + timedelta(1)
+    return data_devolucao == amanha or data_devolucao == hoje
 
 url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
 pagina_consulta = '/empcons?'
