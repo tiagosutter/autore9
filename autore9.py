@@ -1,6 +1,7 @@
 import urllib.request
 import urllib.parse
 from getpass import getpass
+from datetime import date
 import re
 
 
@@ -14,9 +15,14 @@ def consulta(rgu, senha, url):
 
 
 def get_datas_devolucao(html_consulta):
-    """Retorna uma lista com as datas de devolução previstas"""
-    datas = re.findall(r"\d{2}/\d{2}/\d{2}", html_consulta)
-    return datas
+    """Retorna um iterador sobre objetos date com as datas de devolução."""
+    re_datas = re.compile(r"(?P<dia>\d{2})/(?P<mes>\d{2})/(?P<ano>\d{4})")
+    datas = re_datas.finditer(html_consulta)
+    for data in datas:
+        d = data.groupdict()
+        ano, mes, dia = int(d['ano']), int(d['mes']), int(d['dia'])
+        datetime_obj = date(ano, mes, dia)
+        yield datetime_obj
 
 
 def get_urls_renovacao(html_consulta):
