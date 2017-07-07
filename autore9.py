@@ -55,12 +55,18 @@ query = {'bdbanco': 'InformaUCP',
 query_string = urllib.parse.urlencode(query)
 url_consulta = url_base + pagina_consulta + query_string
 
-rgu = int(input("Digite seu RGU: "))
-senha = getpass("Digite sua senha: ")
+if __name__ == '__main__':
+    rgu = int(input("Digite seu RGU: "))
+    senha = getpass("Digite sua senha: ")
 
-resultado_consulta = consulta(rgu, senha, url_consulta)
+    resultado_consulta = consulta(rgu, senha, url_consulta)
 
-if "Senha Inválida" in resultado_consulta:
-    print("Senha Inválida.")
-elif "Usuário não cadastrado" in resultado_consulta:
-    print("Usuário não cadastrado.")
+    if "Senha Inválida" in resultado_consulta:
+        print("Senha Inválida.")
+    elif "Usuário não cadastrado" in resultado_consulta:
+        print("Usuário não cadastrado.")
+
+    urls_renovacao = get_urls_renovacao(resultado_consulta)
+    for url, data in zip(urls_renovacao, get_datas_devolucao(resultado_consulta)):
+        if necessita_renovar(data):
+            urllib.request.urlopen(url)
