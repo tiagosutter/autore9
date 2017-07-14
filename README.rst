@@ -1,3 +1,16 @@
 Autore9
 =======
-Projeto que tem como objetivo automatizar o processo de renovação das publicações emprestadas pela Biblioteca da Universidade Católica de Petrópolis.
+Script para renovar publicações emprestadas pela biblioteca da Universidade Católica de Petrópolis.
+
+Funcionamento
+-------
+
+Solicita RGU e senha quando executado, faz a consulta e renova as publicações se necessário.
+
+Requisito
+-------
+* Python
+
+Uso
+-------
+python autore9.py
