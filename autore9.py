@@ -3,6 +3,23 @@ import urllib.parse
 from getpass import getpass
 from datetime import date, timedelta
 import re
+from html.parser import HTMLParser
+
+class ParserTabela(HTMLParser):
+    """Analisa os dados da tabela HTML."""
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.re_data = re.compile(r"\d{2}/\d{2}/\d{4}")
+        self.dados = []
+        self.titulos = []
+
+    def handle_data(self, data):
+        if self.lasttag == "th":
+            self.titulos.append(data)
+        elif self.lasttag == "td" and "grid" in self.get_starttag_text():
+            self.dados.append(data)
+        elif self.lasttag == "a" and self.re_data.match(data):
+            self.dados.append(data)
 
 
 def consulta(rgu, senha, url):
@@ -10,7 +27,15 @@ def consulta(rgu, senha, url):
     login_payload = dict(codinterno=rgu, senha=senha)
     encoded_login_payload = urllib.parse.urlencode(login_payload).encode()
     with urllib.request.urlopen(url, data=encoded_login_payload) as resposta:
-        html = resposta.read().decode("iso-8859-1")
+        linhas_html = resposta.readlines()
+    html = ""
+    for linha in linhas_html:
+        html += linha.strip().decode("iso-8859-1")
+
+    # descarta as tags b, pois estavam tornando o parsing mais complexo
+    html = html.replace("<b>", "")
+    html = html.replace("</b>", "")
+
     return html
 
 
