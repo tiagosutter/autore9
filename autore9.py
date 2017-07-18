@@ -13,6 +13,17 @@ class ParserTabela(HTMLParser):
         self.dados = []
         self.titulos = []
 
+    def __iter__(self):
+        pos_inicio = 0
+        pos_fim = len(self.titulos)
+        n_emprestimos = int(len(self.dados)/len(self.titulos))
+        for emprestimo in range(n_emprestimos):
+            chunk_emprestimo = self.dados[pos_inicio:pos_fim]
+            dados_emprestimo = dict(zip(self.titulos, chunk_emprestimo))
+            yield dados_emprestimo
+            pos_inicio += len(self.titulos)
+            pos_fim += len(self.titulos)
+
     def handle_data(self, data):
         if self.lasttag == "th":
             self.titulos.append(data)
