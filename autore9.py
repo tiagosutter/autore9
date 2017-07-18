@@ -105,4 +105,4 @@ if __name__ == '__main__':
     urls_renovacao = get_urls_renovacao(resultado_consulta)
     for url, data in zip(urls_renovacao, get_datas_devolucao(resultado_consulta)):
         if necessita_renovar(data):
-            urllib.request.urlopen(url)
+            urllib.request.urlopen(url_base + url)
