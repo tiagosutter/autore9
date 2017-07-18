@@ -9,7 +9,7 @@ Solicita RGU e senha quando executado, faz a consulta e renova as publicações 
 
 Requisito
 -------
-* Python
+* Python 3
 
 Uso
 -------
