@@ -11,9 +11,18 @@ class ParserTabela(HTMLParser):
         HTMLParser.__init__(self)
         self.re_data = re.compile(r"\d{2}/\d{2}/\d{4}")
         self.dados = []
-        self.titulos = []
+        self.re_url = re.compile(r"(?P<url>http://.*emprenova?.*)'")
+        self.titulos = ['Código de empréstimo',
+                        'Data de devolução prevista',
+                        'Código de pubicação',
+                        'Unidade',
+                        'Tipo',
+                        'Identificação',
+                        'Referência',
+                        'URL de renovação']
 
     def __iter__(self):
+        self.corrigir_dados()
         pos_inicio = 0
         pos_fim = len(self.titulos)
         n_emprestimos = int(len(self.dados)/len(self.titulos))
@@ -24,13 +33,34 @@ class ParserTabela(HTMLParser):
             pos_inicio += len(self.titulos)
             pos_fim += len(self.titulos)
 
+    def handle_starttag(self, tag, attrs):
+        atributos = dict(attrs)
+        if tag == "input" and "emprenova" in self.get_starttag_text():
+            mo_url = self.re_url.search(self.get_starttag_text())
+            url = mo_url.groupdict()['url']
+            self.dados.append(url)
+
+        if tag == "input" and "campoCad" in atributos.values():
+            if atributos["value"].isdecimal():
+                self.dados.append(atributos["value"])
+
     def handle_data(self, data):
-        if self.lasttag == "th":
-            self.titulos.append(data)
-        elif self.lasttag == "td" and "grid" in self.get_starttag_text():
+        if self.lasttag == "td" and "grid" in self.get_starttag_text():
             self.dados.append(data)
         elif self.lasttag == "a" and self.re_data.match(data):
             self.dados.append(data)
+
+    def corrigir_dados(self):
+        """
+        Verifica as posições onde a URL de renovação deveria estar
+        e insere uma string vazia caso não haja URL de renovação.
+        """
+        pos_url = 7
+        for pos in range(pos_url, len(self.dados), pos_url+1):
+            if "emprenova" not in self.dados[pos] and self.dados[pos]:
+                self.dados.insert(pos, "")
+        if "emprenova" not in self.dados[-1] and self.dados[-1]:
+            self.dados.append("")
 
 
 def consulta(rgu, senha, url):
