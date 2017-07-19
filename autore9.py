@@ -5,7 +5,8 @@ from datetime import date, timedelta
 import re
 from html.parser import HTMLParser
 
-class ParserTabela(HTMLParser):
+
+class ParserEmprestimos(HTMLParser):
     """Analisa os dados da tabela HTML."""
     def __init__(self):
         HTMLParser.__init__(self)
@@ -48,7 +49,7 @@ class ParserTabela(HTMLParser):
         if self.lasttag == "td" and "grid" in self.get_starttag_text():
             self.dados.append(data)
         elif self.lasttag == "a" and self.re_data.match(data):
-            self.dados.append(data)
+            self.dados.append(converter_em_date_obj(data))
 
     def corrigir_dados(self):
         """
@@ -80,21 +81,18 @@ def consulta(rgu, senha, url):
     return html
 
 
-def get_datas_devolucao(html_consulta):
-    """Retorna um iterador sobre objetos date com as datas de devolução."""
-    re_datas = re.compile(r"(?P<dia>\d{2})/(?P<mes>\d{2})/(?P<ano>\d{4})")
-    datas = re_datas.finditer(html_consulta)
-    for data in datas:
-        d = data.groupdict()
-        ano, mes, dia = int(d['ano']), int(d['mes']), int(d['dia'])
-        datetime_obj = date(ano, mes, dia)
-        yield datetime_obj
-
-
-def get_urls_renovacao(html_consulta):
-    """Retorna uma lista com URLs relativos de renovação"""
-    urls = re.findall(r"(emprenova\?.*?)'", html_consulta)
-    return urls
+def converter_em_date_obj(data_br):
+    """
+    Retorna um objeto date criado a partir de uma string com data
+    no formato dia/mês/ano.
+    """
+    re_data = re.compile(r"(?P<dia>\d{2})/(?P<mes>\d{2})/(?P<ano>\d{4})")
+    mo_data = re_data.match(data_br)
+    data_dict = mo_data.groupdict()
+    ano = int(data_dict['ano'])
+    mes = int(data_dict['mes'])
+    dia = int(data_dict['dia'])
+    return date(ano, mes, dia)
 
 
 def necessita_renovar(data_devolucao):
@@ -132,7 +130,18 @@ if __name__ == '__main__':
     elif "Usuário não cadastrado" in resultado_consulta:
         print("Usuário não cadastrado.")
 
-    urls_renovacao = get_urls_renovacao(resultado_consulta)
-    for url, data in zip(urls_renovacao, get_datas_devolucao(resultado_consulta)):
-        if necessita_renovar(data):
-            urllib.request.urlopen(url_base + url)
+    parser_emprestimos = ParserEmprestimos()
+    parser_emprestimos.feed(resultado_consulta)
+    for emprestimo in parser_emprestimos:
+        if necessita_renovar(emprestimo['Data de devolução prevista']):
+            if emprestimo['URL de renovação']:
+                urllib.request.urlopen(emprestimo['URL de renovação'])
+                print("Foi renovado com sucesso: ", emprestimo['Referência'])
+            else:
+                print("Não tem URL de renovação, favor verificar no site: ",
+                      emprestimo['Referência'])
+        else:
+            print("Não necessita de renovação:",
+                  emprestimo['Referência'],
+                  "- data de devolução:",
+                  emprestimo['Data de devolução prevista'])
