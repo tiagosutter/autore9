@@ -1,3 +1,4 @@
+import argparse
 import urllib.request
 import urllib.parse
 from getpass import getpass
@@ -120,6 +121,14 @@ query_string = urllib.parse.urlencode(query)
 url_consulta = url_base + pagina_consulta + query_string
 
 if __name__ == '__main__':
+    parser_argumentos = argparse.ArgumentParser(description=None)
+    parser_argumentos.add_argument("-fr", "--force-renew",
+                                   help="tenta forçar a renovação "
+                                   "independente da data",
+                                   action="store_true")
+
+    args = parser_argumentos.parse_args()
+
     rgu = int(input("Digite seu RGU: "))
     senha = getpass("Digite sua senha: ")
 
@@ -133,7 +142,8 @@ if __name__ == '__main__':
     parser_emprestimos = ParserEmprestimos()
     parser_emprestimos.feed(resultado_consulta)
     for emprestimo in parser_emprestimos:
-        if necessita_renovar(emprestimo['Data de devolução prevista']):
+        if necessita_renovar(emprestimo['Data de devolução prevista']) or \
+           args.force_renew:
             if emprestimo['URL de renovação']:
                 urllib.request.urlopen(emprestimo['URL de renovação'])
                 print("Foi renovado com sucesso: ", emprestimo['Referência'])
