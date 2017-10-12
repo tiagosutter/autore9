@@ -104,6 +104,10 @@ def necessita_renovar(data_devolucao):
     amanha = hoje + timedelta(1)
     return data_devolucao == amanha or data_devolucao == hoje
 
+def esta_atrasado(data_devolucao):
+    """Retorna True caso a publicação esteja atrasada"""
+    return data_devolucao < date.today()
+
 url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
 pagina_consulta = '/empcons?'
 
@@ -150,6 +154,8 @@ if __name__ == '__main__':
             else:
                 print("Não tem URL de renovação, favor verificar no site: ",
                       emprestimo['Referência'])
+        elif esta_atrasado(emprestimo['Data de devolução prevista']):
+            print("Não tem URL de renovação, pois a publicação está atrasada!", emprestimo['Referência'])
         else:
             print("Não necessita de renovação:",
                   emprestimo['Referência'],
