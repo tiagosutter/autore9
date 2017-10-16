@@ -140,8 +140,13 @@ if __name__ == '__main__':
 
     if "Senha Inválida" in resultado_consulta:
         print("Senha Inválida.")
+        quit()
     elif "Usuário não cadastrado" in resultado_consulta:
         print("Usuário não cadastrado.")
+        quit()
+    elif "Consulta sem resultado" in resultado_consulta:
+        print("Consulta sem resultado")
+        quit()
 
     parser_emprestimos = ParserEmprestimos()
     parser_emprestimos.feed(resultado_consulta)
