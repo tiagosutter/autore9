@@ -4,6 +4,8 @@ import urllib.parse
 from getpass import getpass
 from datetime import date, timedelta
 import re
+import pickle
+import os
 from html.parser import HTMLParser
 
 
@@ -130,11 +132,27 @@ if __name__ == '__main__':
                                    help="tenta forçar a renovação "
                                    "independente da data",
                                    action="store_true")
+    parser_argumentos.add_argument("-e", "--esquecer",
+                                   help="esquece rgu e senha salvos",
+                                   action="store_true")
 
     args = parser_argumentos.parse_args()
 
-    rgu = int(input("Digite seu RGU: "))
-    senha = getpass("Digite sua senha: ")
+    if args.esquecer and os.path.exists('.u_data'):
+        os.remove('.u_data')
+
+    if os.path.exists('.u_data'):
+        with open('.u_data', 'rb') as f:
+            rgu, senha = pickle.load(f)
+    else:
+        rgu = int(input("Digite seu RGU: "))
+        senha = getpass("Digite sua senha: ")
+        salvar = input("Você deseja salvar esses dados (S/N)?: ").lower()
+        if salvar == "s":
+            with open('.u_data', 'wb') as f:
+                pickle.dump((rgu, senha), f)
+            if 'win' in os.sys.platform:
+                os.system("attrib .u_data +h")
 
     resultado_consulta = consulta(rgu, senha, url_consulta)
 
