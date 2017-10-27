@@ -125,6 +125,9 @@ query = {'bdbanco': 'InformaUCP',
 
 query_string = urllib.parse.urlencode(query)
 url_consulta = url_base + pagina_consulta + query_string
+MENSAGENS_DE_ERRO = ("Senha Inválida",
+                     "Usuário não cadastrado",
+                     "Consulta sem resultado")
 
 if __name__ == '__main__':
     parser_argumentos = argparse.ArgumentParser(description=None)
@@ -155,15 +158,12 @@ if __name__ == '__main__':
                 os.system("attrib .u_data +h")
 
     resultado_consulta = consulta(rgu, senha, url_consulta)
-
-    if "Senha Inválida" in resultado_consulta:
-        print("Senha Inválida.")
-        quit()
-    elif "Usuário não cadastrado" in resultado_consulta:
-        print("Usuário não cadastrado.")
-        quit()
-    elif "Consulta sem resultado" in resultado_consulta:
-        print("Consulta sem resultado")
+    erro = [mensagem for mensagem in MENSAGENS_DE_ERRO
+            if mensagem in resultado_consulta]
+    if erro:
+        print("Erro: {}".format(erro[0]))
+        if os.path.exists('.u_data'):
+            os.remove('.u_data')
         quit()
 
     parser_emprestimos = ParserEmprestimos()
