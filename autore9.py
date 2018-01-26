@@ -184,3 +184,5 @@ if __name__ == '__main__':
                   emprestimo['Referência'],
                   "- data de devolução:",
                   emprestimo['Data de devolução prevista'])
+
+input("Pressione ENTER para sair...")
