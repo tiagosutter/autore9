@@ -8,6 +8,10 @@ import pickle
 import os
 from html.parser import HTMLParser
 
+CAMINHO_ARQUIVO = os.path.abspath(os.sys.argv[0])
+DIRETORIO_ARQUIVO = os.path.dirname(CAMINHO_ARQUIVO)
+os.chdir(DIRETORIO_ARQUIVO)
+
 
 class ParserEmprestimos(HTMLParser):
     """Analisa os dados da tabela HTML."""
@@ -162,9 +166,10 @@ if __name__ == '__main__':
             if mensagem in resultado_consulta]
     if erro:
         print("Erro: {}".format(erro[0]))
-        if os.path.exists('.u_data'):
+        if os.path.exists('.u_data') and erro in MENSAGENS_DE_ERRO[0:2]:
             os.remove('.u_data')
-        quit()
+        input("Pressione ENTER para sair...")
+        os.sys.exit()
 
     parser_emprestimos = ParserEmprestimos()
     parser_emprestimos.feed(resultado_consulta)
