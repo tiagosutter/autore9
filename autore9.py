@@ -1,74 +1,69 @@
 import argparse
-import urllib.request
-import urllib.parse
-from getpass import getpass
-from datetime import date, timedelta
-import re
-import pickle
 import os
-from html.parser import HTMLParser
+import pickle
+import re
+import urllib.parse
+import urllib.request
+from datetime import date, timedelta
+from getpass import getpass
 
 CAMINHO_ARQUIVO = os.path.abspath(os.sys.argv[0])
 DIRETORIO_ARQUIVO = os.path.dirname(CAMINHO_ARQUIVO)
 os.chdir(DIRETORIO_ARQUIVO)
 
+URL_BASE = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
+PAGINA_CONSULTA = '/empcons?'
 
-class ParserEmprestimos(HTMLParser):
+# dados necessários para fazer consulta de emprestimos
+QUERY = {'bdbanco': 'InformaUCP',
+         'g': 'web',
+         'grupo': '***',
+         'idSessao': '{C2B12B23-57F6-4FD9-A6CA-71D75901960A}',
+         'idioma': 'POR',
+         'rotina': 'EMP',
+         'tipocons': 'EMPRESTIMO',
+         'unidade': ''}
+
+QUERY_STRING = urllib.parse.urlencode(QUERY)
+URL_CONSULTA = URL_BASE + PAGINA_CONSULTA + QUERY_STRING
+MENSAGENS_DE_ERRO = ("Senha Inválida",
+                     "Usuário não cadastrado",
+                     "Consulta sem resultado")
+
+class ParserEmprestimos():
     """Analisa os dados da tabela HTML."""
+
     def __init__(self):
-        HTMLParser.__init__(self)
+        self.emprestimos = []
+        self.re_tables_emp = re.compile(r"<table class=\"grid\".*?</table>",
+                                        re.DOTALL)
         self.re_data = re.compile(r"\d{2}/\d{2}/\d{4}")
-        self.dados = []
-        self.re_url = re.compile(r"(?P<url>http://.*emprenova?.*)'")
-        self.titulos = ['Código de empréstimo',
-                        'Data de devolução prevista',
-                        'Código de pubicação',
-                        'Unidade',
-                        'Tipo',
-                        'Identificação',
-                        'Referência',
-                        'URL de renovação']
+        self.re_url = re.compile(r"(http://.*emprenova\?.*)'\"")
+        self.re_referencia = re.compile(r"""
+            width=\*>(.*)<b>   # Autor(es)
+            (.*)</b>           # Título
+            (.*)               # Subtítulo e mais
+            """, re.VERBOSE)
 
     def __iter__(self):
-        self.corrigir_dados()
-        pos_inicio = 0
-        pos_fim = len(self.titulos)
-        n_emprestimos = int(len(self.dados)/len(self.titulos))
-        for emprestimo in range(n_emprestimos):
-            chunk_emprestimo = self.dados[pos_inicio:pos_fim]
-            dados_emprestimo = dict(zip(self.titulos, chunk_emprestimo))
-            yield dados_emprestimo
-            pos_inicio += len(self.titulos)
-            pos_fim += len(self.titulos)
+        for emp in self.emprestimos:
+            yield emp
 
-    def handle_starttag(self, tag, attrs):
-        atributos = dict(attrs)
-        if tag == "input" and "emprenova" in self.get_starttag_text():
-            mo_url = self.re_url.search(self.get_starttag_text())
-            url = mo_url.groupdict()['url']
-            self.dados.append(url)
+    def feed(self, html):
+        """Alimenta o parser"""
+        iter_tables_emp = self.re_tables_emp.finditer(html)
+        chaves = ("data", "url", "titulo")
+        for emp in iter_tables_emp:
+            html_table = emp.group()
+            str_data = self.re_data.search(html_table).group()
+            data = converter_em_date_obj(str_data)
+            url = self.re_url.search(html_table)
+            if url:
+                url = url.group(1)
+            titulo = self.re_referencia.search(html_table).group(2)
+            dados = dict(zip(chaves, (data, url, titulo)))
+            self.emprestimos.append(dados)
 
-        if tag == "input" and "campoCad" in atributos.values():
-            if atributos["value"].isdecimal():
-                self.dados.append(atributos["value"])
-
-    def handle_data(self, data):
-        if self.lasttag == "td" and "grid" in self.get_starttag_text():
-            self.dados.append(data)
-        elif self.lasttag == "a" and self.re_data.match(data):
-            self.dados.append(converter_em_date_obj(data))
-
-    def corrigir_dados(self):
-        """
-        Verifica as posições onde a URL de renovação deveria estar
-        e insere uma string vazia caso não haja URL de renovação.
-        """
-        pos_url = 7
-        for pos in range(pos_url, len(self.dados), pos_url+1):
-            if "emprenova" not in self.dados[pos] and self.dados[pos]:
-                self.dados.insert(pos, "")
-        if "emprenova" not in self.dados[-1] and self.dados[-1]:
-            self.dados.append("")
 
 
 def consulta(rgu, senha, url):
@@ -80,10 +75,6 @@ def consulta(rgu, senha, url):
     html = ""
     for linha in linhas_html:
         html += linha.strip().decode("iso-8859-1")
-
-    # descarta as tags b, pois estavam tornando o parsing mais complexo
-    html = html.replace("<b>", "")
-    html = html.replace("</b>", "")
 
     return html
 
@@ -114,26 +105,8 @@ def esta_atrasado(data_devolucao):
     """Retorna True caso a publicação esteja atrasada"""
     return data_devolucao < date.today()
 
-url_base = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
-pagina_consulta = '/empcons?'
 
-# dados necessários para fazer consulta de emprestimos
-query = {'bdbanco': 'InformaUCP',
-         'g': 'web',
-         'grupo': '***',
-         'idSessao': '{C2B12B23-57F6-4FD9-A6CA-71D75901960A}',
-         'idioma': 'POR',
-         'rotina': 'EMP',
-         'tipocons': 'EMPRESTIMO',
-         'unidade': ''}
-
-query_string = urllib.parse.urlencode(query)
-url_consulta = url_base + pagina_consulta + query_string
-MENSAGENS_DE_ERRO = ("Senha Inválida",
-                     "Usuário não cadastrado",
-                     "Consulta sem resultado")
-
-if __name__ == '__main__':
+def set_up_argparser():
     parser_argumentos = argparse.ArgumentParser(description=None)
     parser_argumentos.add_argument("-fr", "--force-renew",
                                    help="tenta forçar a renovação "
@@ -143,7 +116,11 @@ if __name__ == '__main__':
                                    help="esquece rgu e senha salvos",
                                    action="store_true")
 
-    args = parser_argumentos.parse_args()
+    argumentos = parser_argumentos.parse_args()
+    return argumentos
+
+if __name__ == '__main__':
+    args = set_up_argparser()
 
     if args.esquecer and os.path.exists('.u_data'):
         os.remove('.u_data')
@@ -152,7 +129,7 @@ if __name__ == '__main__':
         with open('.u_data', 'rb') as f:
             rgu, senha = pickle.load(f)
     else:
-        rgu = int(input("Digite seu RGU: "))
+        rgu = int(input("Digite seu rgu: "))
         senha = getpass("Digite sua senha: ")
         salvar = input("Você deseja salvar esses dados (S/N)?: ").lower()
         if salvar == "s":
@@ -161,7 +138,7 @@ if __name__ == '__main__':
             if 'win' in os.sys.platform:
                 os.system("attrib .u_data +h")
 
-    resultado_consulta = consulta(rgu, senha, url_consulta)
+    resultado_consulta = consulta(rgu, senha, URL_CONSULTA)
     erro = [mensagem for mensagem in MENSAGENS_DE_ERRO
             if mensagem in resultado_consulta]
     if erro:
@@ -174,20 +151,19 @@ if __name__ == '__main__':
     parser_emprestimos = ParserEmprestimos()
     parser_emprestimos.feed(resultado_consulta)
     for emprestimo in parser_emprestimos:
-        if necessita_renovar(emprestimo['Data de devolução prevista']) or \
-           args.force_renew:
-            if emprestimo['URL de renovação']:
-                urllib.request.urlopen(emprestimo['URL de renovação'])
-                print("Foi renovado com sucesso: ", emprestimo['Referência'])
+        if necessita_renovar(emprestimo['data']) or args.force_renew:
+            if emprestimo['url']:
+                urllib.request.urlopen(emprestimo['url'])
+                print("Foi renovado com sucesso: ", emprestimo['titulo'])
             else:
                 print("Não tem URL de renovação, favor verificar no site: ",
-                      emprestimo['Referência'])
-        elif esta_atrasado(emprestimo['Data de devolução prevista']):
-            print("Não tem URL de renovação, pois a publicação está atrasada!", emprestimo['Referência'])
+                      emprestimo['titulo'])
+        elif esta_atrasado(emprestimo['data']):
+            print("Não tem URL de renovação, pois a publicação está atrasada!",
+                  emprestimo['titulo'])
         else:
-            print("Não necessita de renovação:",
-                  emprestimo['Referência'],
-                  "- data de devolução:",
-                  emprestimo['Data de devolução prevista'])
+            print("Não necessita de renovação:", emprestimo['titulo'],
+                  "- Data de devolução prevista:",
+                  emprestimo['data'].strftime("%d/%m/%Y"))
 
 input("Pressione ENTER para sair...")
