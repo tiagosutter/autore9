@@ -35,8 +35,9 @@ class ParserEmprestimos():
 
     def __init__(self):
         self.emprestimos = []
-        self.re_tables_emp = re.compile(r"<table class=\"grid\".*?</table>",
-                                        re.DOTALL)
+        self.re_table_emp = re.compile(r"<table class=\"grid\".*?</table>",
+                                       re.DOTALL)
+        self.re_table_row_emp = re.compile(r"<tr>.*?</tr>", re.DOTALL)
         self.re_data = re.compile(r"\d{2}/\d{2}/\d{4}")
         self.re_url = re.compile(r"(http://.*emprenova\?.*)'\"")
         self.re_referencia = re.compile(r"""
@@ -51,16 +52,17 @@ class ParserEmprestimos():
 
     def feed(self, html):
         """Alimenta o parser"""
-        iter_tables_emp = self.re_tables_emp.finditer(html)
+        table = self.re_table_emp.search(html).group()
+        tr_emprestimos = self.re_table_row_emp.finditer(table)
         chaves = ("data", "url", "titulo")
-        for emp in iter_tables_emp:
-            html_table = emp.group()
-            str_data = self.re_data.search(html_table).group()
+        for emp in tr_emprestimos:
+            table_row = emp.group()
+            str_data = self.re_data.search(table_row).group()
             data = converter_em_date_obj(str_data)
-            url = self.re_url.search(html_table)
+            url = self.re_url.search(table_row)
             if url:
                 url = url.group(1)
-            titulo = self.re_referencia.search(html_table).group(2)
+            titulo = self.re_referencia.search(table_row).group(2)
             dados = dict(zip(chaves, (data, url, titulo)))
             self.emprestimos.append(dados)
 
@@ -165,5 +167,4 @@ if __name__ == '__main__':
             print("Não necessita de renovação:", emprestimo['titulo'],
                   "- Data de devolução prevista:",
                   emprestimo['data'].strftime("%d/%m/%Y"))
-
-input("Pressione ENTER para sair...")
+    input("Pressione ENTER para sair...")
