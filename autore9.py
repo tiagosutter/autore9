@@ -45,6 +45,7 @@ class ParserEmprestimos():
             (.*)</b>           # Título
             (.*)               # Subtítulo e mais
             """, re.VERBOSE)
+        self.re_isbn = re.compile(r"ISBN (.*)\.")
 
     def __iter__(self):
         for emp in self.emprestimos:
@@ -63,7 +64,11 @@ class ParserEmprestimos():
             if url:
                 url = url.group(1)
             titulo = self.re_referencia.search(table_row).group(2)
-            dados = dict(zip(chaves, (data, url, titulo)))
+            isbn = self.re_isbn.search(table_row)
+            if isbn:
+                digitos_isbn = [c for c in isbn.group(1) if c.isdigit()]
+                isbn = ''.join(digitos_isbn)
+            dados = dict(zip(chaves, (data, url, titulo, isbn)))
             self.emprestimos.append(dados)
 
 
