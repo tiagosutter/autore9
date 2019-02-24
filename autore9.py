@@ -1,15 +1,20 @@
-import argparse
 import os
-import pickle
 import re
+import pickle
 import urllib.parse
-import urllib.request
 from datetime import date, timedelta
-from getpass import getpass
+
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+
+import requests
 
 CAMINHO_ARQUIVO = os.path.abspath(os.sys.argv[0])
 DIRETORIO_ARQUIVO = os.path.dirname(CAMINHO_ARQUIVO)
 os.chdir(DIRETORIO_ARQUIVO)
+
+ARQUIVO_DE_DADOS = '.u_data'
 
 URL_BASE = 'http://200.20.252.54/informaweb/cgi-bin/iwmoduloleitor.dll/'
 PAGINA_CONSULTA = '/empcons?'
@@ -26,9 +31,13 @@ QUERY = {'bdbanco': 'InformaUCP',
 
 QUERY_STRING = urllib.parse.urlencode(QUERY)
 URL_CONSULTA = URL_BASE + PAGINA_CONSULTA + QUERY_STRING
-MENSAGENS_DE_ERRO = ("Senha Inválida",
-                     "Usuário não cadastrado",
-                     "Consulta sem resultado")
+MENSAGENS_DE_ERRO = (
+    "Não há campos preenchidos para a operação",
+    "Campo de senha precisa ser digitado",
+    "Senha Inválida",
+    "Usuário não cadastrado",
+    "Consulta sem resultado")
+
 
 class ParserEmprestimos():
     """Analisa os dados da tabela HTML."""
@@ -72,16 +81,12 @@ class ParserEmprestimos():
             self.emprestimos.append(dados)
 
 
-
 def consulta(rgu, senha, url):
     """Faz a consulta e retorna o resultado html em uma string."""
     login_payload = dict(codinterno=rgu, senha=senha)
-    encoded_login_payload = urllib.parse.urlencode(login_payload).encode()
-    with urllib.request.urlopen(url, data=encoded_login_payload) as resposta:
-        linhas_html = resposta.readlines()
-    html = ""
-    for linha in linhas_html:
-        html += linha.strip().decode("iso-8859-1")
+
+    with requests.post(url, data=login_payload) as resposta:
+        html = resposta.text
 
     return html
 
@@ -108,68 +113,177 @@ def necessita_renovar(data_devolucao):
     amanha = hoje + timedelta(1)
     return data_devolucao == amanha or data_devolucao == hoje
 
+
 def esta_atrasado(data_devolucao):
     """Retorna True caso a publicação esteja atrasada"""
     return data_devolucao < date.today()
 
 
-def set_up_argparser():
-    parser_argumentos = argparse.ArgumentParser(description=None)
-    parser_argumentos.add_argument("-fr", "--force-renew",
-                                   help="tenta forçar a renovação "
-                                   "independente da data",
-                                   action="store_true")
-    parser_argumentos.add_argument("-e", "--esquecer",
-                                   help="esquece rgu e senha salvos",
-                                   action="store_true")
+def save_data(filename, rgu, senha):
+    """Salva dados para arquivo"""
+    with open(filename, 'wb') as f:
+        pickle.dump((rgu, senha), f)
+    if 'win' in os.sys.platform:
+        os.system("attrib " + ARQUIVO_DE_DADOS + " +h")
 
-    argumentos = parser_argumentos.parse_args()
-    return argumentos
+
+def load_data(filename):
+    """Carrega dados salvos"""
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
+
+
+class LoginFormFrame(tk.Frame):
+    """Formulário de login"""
+
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.senha_var = tk.StringVar()
+        self.rgu_var = tk.StringVar()
+        rgu_label = ttk.Label(self, text="RGU: ")
+        rgu_label.grid(row=0, column=0, sticky=(tk.E + tk.W))
+        senha_label = ttk.Label(self, text="Senha: ")
+        senha_label.grid(row=1, column=0, sticky=(tk.E + tk.W))
+
+        comando_validar_rgu = (self.register(self._validar_digito), '%P')
+        rgu_entry = ttk.Entry(self, textvariable=self.rgu_var)
+        rgu_entry.grid(row=0, column=1, pady=5, padx=5)
+        rgu_entry.config(validate='key', validatecommand=comando_validar_rgu)
+        rgu_entry.focus_set()
+
+        self.senha_entry = ttk.Entry(self, show='*',
+                                     textvariable=self.senha_var)
+        self.senha_entry.grid(row=1, column=1, pady=5, padx=5)
+
+        rgu_entry.bind('<Return>', lambda e: self.senha_entry.focus_set())
+
+    def _validar_digito(self, proposed: str) -> bool:
+        return proposed.isdigit()
+
+
+class ConsultaFrame(tk.Frame):
+    """Frame que mostra o resultado da consutla"""
+
+    def __init__(self, parent, *args, **kwargs):
+        self.parent = parent
+        super().__init__(parent, *args, **kwargs)
+        self.tree = ttk.Treeview(self, columns=['data', 'info'], height=5)
+        self.tree.heading('#0', text='Título')
+        self.tree.heading('data', text='Data de entrega prevista')
+        self.tree.heading('info', text='Informação')
+
+        self.btn_esquecer = ttk.Button(self, text="Esquecer meu login",
+                                       command=self.esquecer)
+
+    def show(self, resultado):
+        """Exibe os resutlados da consulta em tabela"""
+        parser = ParserEmprestimos()
+        parser.feed(resultado)
+        for emp in parser:
+            if(necessita_renovar(emp['data'])):
+                if emp['url']:
+                    requests.get(emp['url'])
+                    info = 'Foi renovado com sucesso'
+                else:
+                    info = 'Não é possível renovar, verificar no site'
+            else:
+                info = "Não necessita de renovação"
+            self.tree.insert(
+                '',
+                'end',
+                text=emp['titulo'],
+                values=(emp['data'].strftime("%d/%m/%Y"), info)
+            )
+        self.tree.grid()
+        if os.path.exists(ARQUIVO_DE_DADOS):
+            self.btn_esquecer.grid(row=1, column=0, sticky=tk.E)
+        self.tkraise()
+
+    def esquecer(self):
+        """Deleta os dados salvos"""
+        try:
+            os.remove(ARQUIVO_DE_DADOS)
+            self.btn_esquecer.grid_forget()
+            label = ttk.Label(self, text='Dados de login removidos')
+            label.grid()
+        except PermissionError:
+            messagebox.showwarning(
+                "Autore9: ERRO DE PERMISSÃO",
+                message="Erro de permissão ao apagar dados")
+
+
+class Application(tk.Tk):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title("Autore9")
+        self.geometry('250x130')
+        self.resizable(height=False, width=False)
+
+        self.consulta = ConsultaFrame(self)
+        self.consulta.grid(row=0, column=0)
+        self.login_form = LoginFormFrame(self)
+        self.login_form.grid(row=0, column=0)
+
+        self.login_form.senha_entry.bind('<Return>', self.login)
+
+        self.salvar = tk.IntVar()
+        self.chkbox_save = ttk.Checkbutton(self, text='Lembrar de mim',
+                                           variable=self.salvar)
+        self.chkbox_save.grid(row=1, column=0, pady=5)
+
+        self.enter_button = ttk.Button(self, command=self.login, text="Entrar")
+        self.enter_button.grid(row=2, column=0, pady=5)
+
+        self.columnconfigure(0, weight=1)
+        if os.path.exists(ARQUIVO_DE_DADOS):
+            self.lembrar_login()
+
+    def salvar_login(self, rgu, senha):
+        """Salva os dados do formulário para arquivo"""
+        try:
+            save_data(ARQUIVO_DE_DADOS, rgu, senha)
+        except PermissionError:
+            messagebox.showwarning(
+                "Autore9: ERRO DE PERMISSÃO",
+                message="Erro de permissão ao salvar dados")
+
+    def lembrar_login(self):
+        """Carrega o arquivo com dados do usuário"""
+        try:
+            rgu, senha = load_data(ARQUIVO_DE_DADOS)
+            self.login_form.rgu_var.set(rgu)
+            self.login_form.senha_var.set(senha)
+            self.login()
+        except PermissionError:
+            messagebox.showwarning(
+                "Autore9: ERRO DE PERMISSÃO",
+                message="Sem permissão para acessar dados salvos")
+
+    def login(self, event=None):
+        """Realiza a consulta"""
+        rgu = self.login_form.rgu_var.get()
+        senha = self.login_form.senha_var.get()
+
+        try:
+            resultado_consulta = consulta(rgu, senha, URL_CONSULTA)
+            erro = [mensagem for mensagem in MENSAGENS_DE_ERRO
+                    if mensagem in resultado_consulta]
+        except requests.ConnectionError:
+            erro = ['Erro de conexão']
+
+        if erro:
+            messagebox.showerror("Autore9: ERRO NA CONSULTA", message=erro[0])
+        else:
+            self.geometry('')
+            self.login_form.grid_forget()
+            self.enter_button.grid_forget()
+            self.chkbox_save.grid_forget()
+            self.consulta.show(resultado_consulta)
+            if self.salvar.get() == 1:
+                self.salvar_login(rgu, senha)
+
 
 if __name__ == '__main__':
-    args = set_up_argparser()
-
-    if args.esquecer and os.path.exists('.u_data'):
-        os.remove('.u_data')
-
-    if os.path.exists('.u_data'):
-        with open('.u_data', 'rb') as f:
-            rgu, senha = pickle.load(f)
-    else:
-        rgu = int(input("Digite seu rgu: "))
-        senha = getpass("Digite sua senha: ")
-        salvar = input("Você deseja salvar esses dados (S/N)?: ").lower()
-        if salvar == "s":
-            with open('.u_data', 'wb') as f:
-                pickle.dump((rgu, senha), f)
-            if 'win' in os.sys.platform:
-                os.system("attrib .u_data +h")
-
-    resultado_consulta = consulta(rgu, senha, URL_CONSULTA)
-    erro = [mensagem for mensagem in MENSAGENS_DE_ERRO
-            if mensagem in resultado_consulta]
-    if erro:
-        print("Erro: {}".format(erro[0]))
-        if os.path.exists('.u_data') and erro in MENSAGENS_DE_ERRO[0:2]:
-            os.remove('.u_data')
-        input("Pressione ENTER para sair...")
-        os.sys.exit()
-
-    parser_emprestimos = ParserEmprestimos()
-    parser_emprestimos.feed(resultado_consulta)
-    for emprestimo in parser_emprestimos:
-        if necessita_renovar(emprestimo['data']) or args.force_renew:
-            if emprestimo['url']:
-                urllib.request.urlopen(emprestimo['url'])
-                print("Foi renovado com sucesso: ", emprestimo['titulo'])
-            else:
-                print("Não tem URL de renovação, favor verificar no site: ",
-                      emprestimo['titulo'])
-        elif esta_atrasado(emprestimo['data']):
-            print("Não tem URL de renovação, pois a publicação está atrasada!",
-                  emprestimo['titulo'])
-        else:
-            print("Não necessita de renovação:", emprestimo['titulo'],
-                  "- Data de devolução prevista:",
-                  emprestimo['data'].strftime("%d/%m/%Y"))
-    input("Pressione ENTER para sair...")
+    app = Application()
+    app.mainloop()
