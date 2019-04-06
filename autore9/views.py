@@ -38,7 +38,7 @@ class LoginFormFrame(tk.Frame):
         rgu_entry.bind('<Return>', lambda e: self.senha_entry.focus_set())
 
     def _validar_digito(self, proposed: str) -> bool:
-        return proposed.isdigit()
+        return proposed.isdigit() or len(proposed) == 0
 
 
 class ConsultaFrame(tk.Frame):
